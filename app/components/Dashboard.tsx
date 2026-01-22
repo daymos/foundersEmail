@@ -15,6 +15,12 @@ interface Email {
     receivedAt: string;
     read: boolean;
     replied: boolean;
+    hasAttachments?: boolean;
+    attachments?: Array<{
+        filename: string;
+        contentType: string;
+        size: number;
+    }>;
 }
 
 interface User {
@@ -118,8 +124,15 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
                             </div>
                             <div className={`text-sm truncate mb-1 ${selectedEmail?.id === email.id ? 'text-blue-800' : 'text-gray-800'}`}>{email.subject}</div>
                             <div className="flex justify-between items-center mt-2">
-                                <div className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full truncate max-w-[150px]">
-                                    To: {email.recipient}
+                                <div className="flex items-center gap-2">
+                                    <div className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full truncate max-w-[150px]">
+                                        To: {email.recipient}
+                                    </div>
+                                    {email.hasAttachments && (
+                                        <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full flex items-center gap-1" title={`${email.attachments?.length || 0} attachment(s)`}>
+                                            📎 {email.attachments?.length || 0}
+                                        </span>
+                                    )}
                                 </div>
                                 {email.replied && (
                                     <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
@@ -161,7 +174,47 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
                         </div>
 
                         <div className="flex-grow overflow-y-auto p-8 bg-white">
-                            <div className="prose max-w-none text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml || selectedEmail.bodyPlain }} />
+                            {(selectedEmail.bodyHtml || selectedEmail.bodyPlain) ? (
+                                <div className="prose max-w-none text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml || selectedEmail.bodyPlain }} />
+                            ) : (
+                                <div className="text-gray-500 italic">
+                                    {selectedEmail.hasAttachments ? 
+                                        '(This email contains only attachments, no text body)' : 
+                                        '(Empty email body)'}
+                                </div>
+                            )}
+                            
+                            {selectedEmail.hasAttachments && selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+                                <div className="mt-6 pt-6 border-t border-gray-200">
+                                    <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+                                        </svg>
+                                        Attachments ({selectedEmail.attachments.length})
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {selectedEmail.attachments.map((att, idx) => (
+                                            <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded flex items-center justify-center text-blue-600">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                        <polyline points="14 2 14 8 20 8"></polyline>
+                                                    </svg>
+                                                </div>
+                                                <div className="flex-grow min-w-0">
+                                                    <div className="font-medium text-gray-900 truncate">{att.filename}</div>
+                                                    <div className="text-xs text-gray-500">
+                                                        {att.contentType} • {(att.size / 1024).toFixed(1)} KB
+                                                    </div>
+                                                </div>
+                                                <div className="text-xs text-gray-400 italic">
+                                                    Preview not available
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="p-6 border-t border-gray-200 bg-gray-50">
