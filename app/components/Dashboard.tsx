@@ -48,10 +48,34 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
         return emails.filter(e => e.recipient === filterRecipient);
     }, [emails, filterRecipient]);
 
+    // Get conversation thread for the selected email
+    const conversationThread = useMemo(() => {
+        if (!selectedEmail) return [];
+        
+        // Normalize subject by removing "Re:", "Fwd:", etc.
+        const normalizeSubject = (subject: string) => {
+            return subject.replace(/^(Re|Fwd|Fw):\s*/gi, '').trim().toLowerCase();
+        };
+        
+        const selectedSubject = normalizeSubject(selectedEmail.subject);
+        
+        // Find all emails with the same normalized subject
+        const thread = emails.filter(email => {
+            const emailSubject = normalizeSubject(email.subject);
+            return emailSubject === selectedSubject;
+        });
+        
+        // Sort by date (oldest first)
+        return thread.sort((a, b) => 
+            new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime()
+        );
+    }, [selectedEmail, emails]);
+
     const handleReply = async () => {
         if (!selectedEmail) return;
         setSending(true);
-        const result = await sendReply(selectedEmail.id, selectedEmail.sender, selectedEmail.subject, replyText);
+        // Reply FROM the address where the email was received (recipient)
+        const result = await sendReply(selectedEmail.id, selectedEmail.sender, selectedEmail.subject, replyText, selectedEmail.recipient);
         setSending(false);
         if (result.success) {
             alert('Reply sent!');
@@ -174,47 +198,68 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
                         </div>
 
                         <div className="flex-grow overflow-y-auto p-8 bg-white">
-                            {(selectedEmail.bodyHtml || selectedEmail.bodyPlain) ? (
-                                <div className="prose max-w-none text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml || selectedEmail.bodyPlain }} />
-                            ) : (
-                                <div className="text-gray-500 italic">
-                                    {selectedEmail.hasAttachments ? 
-                                        '(This email contains only attachments, no text body)' : 
-                                        '(Empty email body)'}
+                            {conversationThread.length > 1 && (
+                                <div className="mb-4 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <strong>{conversationThread.length} messages</strong> in this conversation
                                 </div>
                             )}
                             
-                            {selectedEmail.hasAttachments && selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-                                <div className="mt-6 pt-6 border-t border-gray-200">
-                                    <h4 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-                                        </svg>
-                                        Attachments ({selectedEmail.attachments.length})
-                                    </h4>
-                                    <div className="space-y-2">
-                                        {selectedEmail.attachments.map((att, idx) => (
-                                            <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                                                <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded flex items-center justify-center text-blue-600">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                                        <polyline points="14 2 14 8 20 8"></polyline>
+                            <div className="space-y-6">
+                                {conversationThread.map((email, idx) => (
+                                    <div key={email.id} className={`${idx > 0 ? 'pt-6 border-t border-gray-200' : ''}`}>
+                                        <div className="mb-3 text-sm text-gray-600 flex justify-between items-start">
+                                            <div>
+                                                <div className="font-semibold text-gray-900">{email.sender}</div>
+                                                <div className="text-xs text-gray-500">{new Date(email.receivedAt).toLocaleString()}</div>
+                                            </div>
+                                            {email.replied && (
+                                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                                                    ✓ Replied
+                                                </span>
+                                            )}
+                                        </div>
+                                        
+                                        {(email.bodyHtml || email.bodyPlain) ? (
+                                            <div className="prose max-w-none text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: email.bodyHtml || email.bodyPlain }} />
+                                        ) : (
+                                            <div className="text-gray-500 italic">
+                                                {email.hasAttachments ? 
+                                                    '(This email contains only attachments, no text body)' : 
+                                                    '(Empty email body)'}
+                                            </div>
+                                        )}
+                                        
+                                        {email.hasAttachments && email.attachments && email.attachments.length > 0 && (
+                                            <div className="mt-4">
+                                                <h4 className="font-semibold text-gray-700 mb-2 text-sm flex items-center gap-2">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
                                                     </svg>
-                                                </div>
-                                                <div className="flex-grow min-w-0">
-                                                    <div className="font-medium text-gray-900 truncate">{att.filename}</div>
-                                                    <div className="text-xs text-gray-500">
-                                                        {att.contentType} • {(att.size / 1024).toFixed(1)} KB
-                                                    </div>
-                                                </div>
-                                                <div className="text-xs text-gray-400 italic">
-                                                    Preview not available
+                                                    Attachments ({email.attachments.length})
+                                                </h4>
+                                                <div className="space-y-2">
+                                                    {email.attachments.map((att, attIdx) => (
+                                                        <div key={attIdx} className="flex items-center gap-3 p-2 bg-gray-50 rounded border border-gray-200 text-sm">
+                                                            <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded flex items-center justify-center text-blue-600">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                                                </svg>
+                                                            </div>
+                                                            <div className="flex-grow min-w-0">
+                                                                <div className="font-medium text-gray-900 truncate text-xs">{att.filename}</div>
+                                                                <div className="text-xs text-gray-500">
+                                                                    {(att.size / 1024).toFixed(1)} KB
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
-                                        ))}
+                                        )}
                                     </div>
-                                </div>
-                            )}
+                                ))}
+                            </div>
                         </div>
 
                         <div className="p-6 border-t border-gray-200 bg-gray-50">

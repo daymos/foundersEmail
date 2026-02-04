@@ -21,13 +21,39 @@ export async function POST(req: NextRequest) {
         const bodyPlain = body['Text-part'] || body.TextPart || '';
         const bodyHtml = body['Html-part'] || body.HtmlPart || '';
 
-        // Handle attachments
-        const attachments = body.Attachments || body.attachments || [];
-        const attachmentInfo = attachments.map((att: any) => ({
-            filename: att.Name || att.Filename || att.filename || 'unknown',
-            contentType: att['Content-Type'] || att.ContentType || att.contentType || 'application/octet-stream',
-            size: att.ContentLength || att.Size || att.size || 0,
-        }));
+        // Handle attachments from Mailjet Parse API
+        // Attachments are in the Parts array with ContentRef like "Attachment1", "Attachment2", etc.
+        const parts = body.Parts || [];
+        const attachmentInfo = parts
+            .filter((part: any) => part.ContentRef && part.ContentRef.startsWith('Attachment'))
+            .map((part: any) => {
+                const headers = part.Headers || {};
+                const contentType = headers['Content-Type'] || 'application/octet-stream';
+                const contentDisposition = headers['Content-Disposition'] || '';
+                
+                // Extract filename from Content-Disposition or Content-Type
+                let filename = 'unknown';
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
+                } else {
+                    const nameMatch = contentType.match(/name[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (nameMatch && nameMatch[1]) {
+                        filename = nameMatch[1].replace(/['"]/g, '');
+                    }
+                }
+                
+                // Get attachment content and estimate size
+                const attachmentContent = body[part.ContentRef] || '';
+                const size = attachmentContent ? Buffer.from(attachmentContent, 'base64').length : 0;
+                
+                return {
+                    filename,
+                    contentType: contentType.split(';')[0].trim(),
+                    size,
+                    contentRef: part.ContentRef
+                };
+            });
 
         // Log if email appears empty
         if (!bodyPlain && !bodyHtml && attachments.length > 0) {
@@ -46,7 +72,8 @@ export async function POST(req: NextRequest) {
             hasAttachments: attachmentInfo.length > 0,
             receivedAt: admin.firestore.FieldValue.serverTimestamp(),
             read: false,
-            replied: false
+            replied: false,
+            rawPayload: JSON.stringify(body) // Store raw payload for debugging
         });
 
         return NextResponse.json({ status: 'ok' });

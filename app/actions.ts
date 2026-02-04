@@ -21,11 +21,14 @@ export async function getEmails() {
     }
 }
 
-export async function sendReply(emailId: string, to: string, subject: string, text: string) {
+export async function sendReply(emailId: string, to: string, subject: string, text: string, fromEmail?: string) {
     const mailjet = require('node-mailjet').apiConnect(
         process.env.MAILJET_API_KEY || '',
         process.env.MAILJET_API_SECRET || ''
     );
+
+    // Use the provided fromEmail or fall back to SENDER_EMAIL
+    const senderEmail = fromEmail || process.env.SENDER_EMAIL;
 
     try {
         await mailjet
@@ -34,7 +37,7 @@ export async function sendReply(emailId: string, to: string, subject: string, te
                 Messages: [
                     {
                         From: {
-                            Email: process.env.SENDER_EMAIL,
+                            Email: senderEmail,
                             Name: 'Support'
                         },
                         To: [
