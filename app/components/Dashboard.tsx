@@ -35,6 +35,11 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
     const [replyText, setReplyText] = useState('');
     const [sending, setSending] = useState(false);
     const [filterRecipient, setFilterRecipient] = useState<string>('all');
+    const [composing, setComposing] = useState(false);
+    const [composeTo, setComposeTo] = useState('');
+    const [composeSubject, setComposeSubject] = useState('');
+    const [composeBody, setComposeBody] = useState('');
+    const [composeFrom, setComposeFrom] = useState('');
 
     // Extract unique recipient emails
     const uniqueRecipients = useMemo(() => {
@@ -88,6 +93,27 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
         }
     };
 
+    const handleCompose = async () => {
+        if (!composeTo || !composeSubject || !composeBody || !composeFrom) {
+            alert('Please fill in all fields');
+            return;
+        }
+        setSending(true);
+        // Use a dummy email ID and send from the selected address
+        const result = await sendReply('', composeTo, composeSubject, composeBody, composeFrom);
+        setSending(false);
+        if (result.success) {
+            alert('Email sent!');
+            setComposing(false);
+            setComposeTo('');
+            setComposeSubject('');
+            setComposeBody('');
+            setComposeFrom('');
+        } else {
+            alert('Failed to send email');
+        }
+    };
+
     return (
         <div className="flex h-screen bg-gray-50 font-sans text-gray-900">
             {/* Sidebar / List */}
@@ -96,6 +122,19 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
                     <div className="flex items-center justify-between mb-3">
                         <div className="font-bold text-xl text-gray-800">Inbox</div>
                         <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => {
+                                    setComposing(true);
+                                    setSelectedEmail(null);
+                                }}
+                                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path>
+                                    <path d="m3 7 9 6 9-6"></path>
+                                </svg>
+                                <span>Compose</span>
+                            </button>
                             {user?.image && (
                                 <img
                                     src={user.image}
@@ -177,7 +216,111 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
 
             {/* Detail View */}
             <div className="w-2/3 flex flex-col h-screen overflow-hidden bg-white">
-                {selectedEmail ? (
+                {composing ? (
+                    <div className="flex flex-col h-full">
+                        <div className="p-8 border-b border-gray-200 bg-gray-50 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-2xl font-bold text-gray-900">New Email</h2>
+                                <button
+                                    onClick={() => setComposing(false)}
+                                    className="text-gray-500 hover:text-gray-700"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="flex-grow overflow-y-auto p-8 bg-white">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">From</label>
+                                    <select
+                                        value={composeFrom}
+                                        onChange={(e) => setComposeFrom(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                    >
+                                        <option value="">Select sender address...</option>
+                                        {uniqueRecipients.map(recipient => (
+                                            <option key={recipient} value={recipient}>
+                                                {recipient}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+                                    <input
+                                        type="email"
+                                        value={composeTo}
+                                        onChange={(e) => setComposeTo(e.target.value)}
+                                        placeholder="recipient@example.com"
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                                    <input
+                                        type="text"
+                                        value={composeSubject}
+                                        onChange={(e) => setComposeSubject(e.target.value)}
+                                        placeholder="Email subject"
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                                    <textarea
+                                        value={composeBody}
+                                        onChange={(e) => setComposeBody(e.target.value)}
+                                        placeholder="Type your message here..."
+                                        rows={12}
+                                        className="w-full p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-gray-200 bg-gray-50">
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={() => setComposing(false)}
+                                    className="px-6 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleCompose}
+                                    disabled={sending || !composeFrom || !composeTo || !composeSubject || !composeBody}
+                                    className="bg-blue-600 text-white px-6 py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm transition-colors flex items-center gap-2"
+                                >
+                                    {sending ? (
+                                        <>
+                                            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Sending...
+                                        </>
+                                    ) : (
+                                        <>
+                                            Send Email
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                            </svg>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : selectedEmail ? (
                     <div className="flex flex-col h-full">
                         <div className="p-8 border-b border-gray-200 bg-gray-50 shadow-sm z-10">
                             <h2 className="text-2xl font-bold mb-4 text-gray-900 leading-tight">{selectedEmail.subject}</h2>
@@ -239,7 +382,12 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
                                                 </h4>
                                                 <div className="space-y-2">
                                                     {email.attachments.map((att, attIdx) => (
-                                                        <div key={attIdx} className="flex items-center gap-3 p-2 bg-gray-50 rounded border border-gray-200 text-sm">
+                                                        <a
+                                                            key={attIdx}
+                                                            href={`/api/attachments/${email.id}/${attIdx}`}
+                                                            download={att.filename}
+                                                            className="flex items-center gap-3 p-2 bg-gray-50 rounded border border-gray-200 text-sm hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
+                                                        >
                                                             <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded flex items-center justify-center text-blue-600">
                                                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -252,7 +400,14 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
                                                                     {(att.size / 1024).toFixed(1)} KB
                                                                 </div>
                                                             </div>
-                                                        </div>
+                                                            <div className="flex-shrink-0 text-blue-600">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                                                </svg>
+                                                            </div>
+                                                        </a>
                                                     ))}
                                                 </div>
                                             </div>

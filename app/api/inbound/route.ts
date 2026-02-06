@@ -28,35 +28,39 @@ export async function POST(req: NextRequest) {
             .filter((part: any) => part.ContentRef && part.ContentRef.startsWith('Attachment'))
             .map((part: any) => {
                 const headers = part.Headers || {};
-                const contentType = headers['Content-Type'] || 'application/octet-stream';
-                const contentDisposition = headers['Content-Disposition'] || '';
+                // Headers are arrays, get first element
+                const contentTypeArray = headers['Content-Type'] || [];
+                const contentDispositionArray = headers['Content-Disposition'] || [];
+                const contentType = Array.isArray(contentTypeArray) ? contentTypeArray[0] : contentTypeArray || 'application/octet-stream';
+                const contentDisposition = Array.isArray(contentDispositionArray) ? contentDispositionArray[0] : contentDispositionArray || '';
                 
                 // Extract filename from Content-Disposition or Content-Type
                 let filename = 'unknown';
                 const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
                 if (filenameMatch && filenameMatch[1]) {
-                    filename = filenameMatch[1].replace(/['"]/g, '');
+                    filename = filenameMatch[1].replace(/['"\\t]/g, '').trim();
                 } else {
                     const nameMatch = contentType.match(/name[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
                     if (nameMatch && nameMatch[1]) {
-                        filename = nameMatch[1].replace(/['"]/g, '');
+                        filename = nameMatch[1].replace(/['"]/g, '').trim();
                     }
                 }
                 
                 // Get attachment content and estimate size
                 const attachmentContent = body[part.ContentRef] || '';
-                const size = attachmentContent ? Buffer.from(attachmentContent, 'base64').length : 0;
+                const size = attachmentContent ? Math.round(Buffer.from(attachmentContent, 'base64').length) : 0;
                 
                 return {
                     filename,
                     contentType: contentType.split(';')[0].trim(),
                     size,
-                    contentRef: part.ContentRef
+                    contentRef: part.ContentRef,
+                    data: attachmentContent // Store base64 data for download
                 };
             });
 
         // Log if email appears empty
-        if (!bodyPlain && !bodyHtml && attachments.length > 0) {
+        if (!bodyPlain && !bodyHtml && attachmentInfo.length > 0) {
             console.log('Email has only attachments, no text/html body');
         }
 

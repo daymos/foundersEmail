@@ -45,15 +45,18 @@ export async function sendReply(emailId: string, to: string, subject: string, te
                                 Email: to
                             }
                         ],
-                        Subject: subject.startsWith('Re:') ? subject : `Re: ${subject}`,
+                        Subject: emailId && !subject.startsWith('Re:') ? `Re: ${subject}` : subject,
                         TextPart: text
                     }
                 ]
             });
 
-        await db.collection('emails').doc(emailId).update({
-            replied: true
-        });
+        // Only update the email document if emailId is provided (replying to existing email)
+        if (emailId) {
+            await db.collection('emails').doc(emailId).update({
+                replied: true
+            });
+        }
 
         return { success: true };
     } catch (error) {
