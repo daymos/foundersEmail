@@ -64,10 +64,21 @@ export default function Dashboard({ initialEmails, user }: { initialEmails: Emai
         
         const selectedSubject = normalizeSubject(selectedEmail.subject);
         
-        // Find all emails with the same normalized subject
+        // Don't thread if subject is empty or generic
+        if (!selectedSubject || selectedSubject === '(no subject)') {
+            return [selectedEmail];
+        }
+        
+        // Find all emails with the same normalized subject AND same sender/recipient pair
         const thread = emails.filter(email => {
             const emailSubject = normalizeSubject(email.subject);
-            return emailSubject === selectedSubject;
+            const sameSubject = emailSubject === selectedSubject;
+            
+            // Check if same conversation (either same sender or part of back-and-forth)
+            const sameSender = email.sender === selectedEmail.sender || email.sender === selectedEmail.recipient;
+            const sameRecipient = email.recipient === selectedEmail.recipient || email.recipient === selectedEmail.sender;
+            
+            return sameSubject && (sameSender || sameRecipient);
         });
         
         // Sort by date (oldest first)
