@@ -1,0 +1,38 @@
+version: '3'
+
+vars:
+  PROJECT_ID: emailer-prod-b48590
+  REGION: us-central1
+  SERVICE: emailer
+  IMAGE: us-central1-docker.pkg.dev/emailer-prod-b48590/emailer-repo/emailer:latest
+
+tasks:
+  build:
+    desc: Build Docker image
+    cmds:
+      - echo "🏗️  Building Docker image..."
+      - gcloud builds submit --tag {{.IMAGE}} . --project {{.PROJECT_ID}}
+
+  deploy:
+    desc: Build and deploy to Cloud Run
+    cmds:
+      - task: build
+      - echo "🚀 Deploying to Cloud Run..."
+      - gcloud run deploy {{.SERVICE}} --image {{.IMAGE}} --platform managed --region {{.REGION}} --project {{.PROJECT_ID}}
+      - echo "✅ Deployment complete!"
+      - echo "🌐 Service URL: https://emailer-84818240112.us-central1.run.app"
+
+  logs:
+    desc: View recent logs
+    cmds:
+      - gcloud run services logs read {{.SERVICE}} --region {{.REGION}} --project {{.PROJECT_ID}} --limit 50
+
+  tail:
+    desc: Tail logs in real-time
+    cmds:
+      - gcloud alpha run services logs tail {{.SERVICE}} --region {{.REGION}} --project {{.PROJECT_ID}}
+
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
